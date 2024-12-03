@@ -4,6 +4,11 @@
 """
 Escriba el codigo que ejecute la accion solicitada en cada pregunta.
 """
+import csv
+import fileinput
+import glob
+import os
+import zipfile
 
 
 def pregunta_01():
@@ -71,3 +76,78 @@ def pregunta_01():
 
 
     """
+
+    # Leer registros
+    def load_files(input_directory):
+
+        input_directory = os.path.join(input_directory, "*")
+        files = glob.glob(input_directory)
+        with fileinput.input(files=files) as f:
+            for line in f:
+                generator = (
+                    yield line,
+                    f.filename().split("/")[-2],
+                )
+
+        return generator
+
+    # Exportar a CSV
+    def export_to_csv(data, output_directory, filename):
+
+        def create_output_directory(output_directory) -> None:
+            """Vidalación de la existencia del archivo y creación de la carpeta"""
+
+            folders = glob.glob(f"{output_directory}/*")
+            if len(folders) >= 2:
+                for file in folders:
+                    os.remove(file)
+                os.rmdir(output_directory)
+
+            os.makedirs(output_directory, exist_ok=True)
+
+        def save_csv(data, output_directory, filename):
+            """Guarda la información en un archivo CSV"""
+
+            fieldnames = ["phrase", "target"]
+            file_path = os.path.join(output_directory, filename)
+            with open(file_path, "w") as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+                for row in data:
+                    writer.writerow({"phrase": row[0], "target": row[1]})
+
+        create_output_directory(output_directory)
+        save_csv(data, output_directory, filename)
+
+    # Procesar archivos
+    def run_job(zip_file, output_directory):
+        """Ejecuta el proceso"""
+
+        def unzip_files(zip_file):
+            """Descomprime los archivos"""
+            with zipfile.ZipFile(zip_file, "r") as zip_ref:
+                # Extract all the contents to the specified directory
+                zip_ref.extractall(zip_file.split("/")[0])
+
+        def process_files(input_directory, output_directory):
+            """Procesa los archivos"""
+            for folders in glob.glob(f"{input_directory}/*"):
+                data = []
+                for folder in glob.glob(folders + "/*"):
+                    sequence = load_files(folder)
+                    data.extend(sequence)
+
+                filename = f"{folders.split('/')[-1]}_dataset.csv"
+                export_to_csv(data, output_directory, filename)
+
+        unzip_files(zip_file)
+        input_directory = zip_file.split(".")[0]
+        process_files(input_directory, output_directory)
+
+    run_job("files/input.zip", "files/output")
+
+    return "Proceso finalizado"
+
+
+if __name__ == "__main__":
+    print(pregunta_01())
